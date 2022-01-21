@@ -1,24 +1,20 @@
 package domain
 
-type Update struct {
-	Id  int64   `json:"update_id"`
-	Msg Message `json:"message"`
+import "time"
+
+type ChatInfo struct {
+	IsWorking  bool
+	Done       chan struct{}
+	PollInfo   *PollInfo
+	HeadPerson *HeadPerson
 }
 
-type Message struct {
-	Id   int64  `json:"message_id"`
-	Text string `json:"text"`
-	Chat Chat   `json:"chat"`
-	User User   `json:"from"`
+type HeadPerson struct {
+	Username string
+	ChatID   int64
 }
 
-type Chat struct {
-	Id    int64  `json:"id"`
-	Title string `json:"title"`
-}
-
-type User struct {
-	Id        int64  `json:"id"`
-	FirstName string `json:"first_name"`
-	Username  string `json:"username"`
+type PollInfo struct {
+	ID    int64
+	Times []time.Time
 }

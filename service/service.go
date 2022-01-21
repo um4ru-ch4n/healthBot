@@ -2,32 +2,31 @@ package service
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/um4aru-ch4n/healthBot/config"
+	"github.com/um4aru-ch4n/healthBot/domain"
 )
 
 type Service struct {
-	chatInfo map[int64]*ChatInfo
-}
-
-type ChatInfo struct {
-	isWorking bool
-	done      chan struct{}
-	pollID    int64
+	chatInfo map[int64]*domain.ChatInfo
 }
 
 func NewService(cfg *config.Config) *Service {
 	newService := &Service{
-		chatInfo: make(map[int64]*ChatInfo),
+		chatInfo: make(map[int64]*domain.ChatInfo),
 	}
 
-	newService.chatInfo[-727028014] = &ChatInfo{
-		isWorking: false,
-		done:      make(chan struct{}),
-		pollID:    0,
+	newService.chatInfo[-727028014] = &domain.ChatInfo{
+		IsWorking: false,
+		Done:      make(chan struct{}),
+		PollInfo:  &domain.PollInfo{},
+		HeadPerson: &domain.HeadPerson{
+			Username: "oooMRXooo",
+			ChatID:   371947069,
+		},
 	}
 
 	return newService
@@ -56,13 +55,24 @@ func (srv *Service) Start(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
 func (srv *Service) StartRoutine(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
 	var newMsg tgbotapi.MessageConfig
 
-	if srv.chatInfo[msg.Chat.ID].isWorking {
+	if srv.chatInfo[msg.Chat.ID].IsWorking {
 		newMsg = tgbotapi.NewMessage(msg.Chat.ID, "Bot is already started")
 		bot.Send(newMsg)
 		return
 	}
-	srv.chatInfo[msg.Chat.ID].done = make(chan struct{}, 1)
-	srv.chatInfo[msg.Chat.ID].isWorking = true
+
+	times, err := parseTimeSliceFromString(msg.CommandArguments())
+	if err != nil {
+		newMsg = tgbotapi.NewMessage(msg.Chat.ID, err.Error())
+		newMsg.ParseMode = "MarkdownV2"
+		bot.Send(newMsg)
+		return
+	}
+
+	srv.chatInfo[msg.Chat.ID].PollInfo.Times = times
+
+	srv.chatInfo[msg.Chat.ID].Done = make(chan struct{}, 1)
+	srv.chatInfo[msg.Chat.ID].IsWorking = true
 
 	go srv.createPolls(bot, msg.Chat.ID)
 
@@ -70,10 +80,30 @@ func (srv *Service) StartRoutine(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
 	bot.Send(newMsg)
 }
 
+func parseTimeSliceFromString(argTime string) ([]time.Time, error) {
+	times := strings.Split(argTime, " ")
+
+	if len(times) < 2 {
+		return nil, fmt.Errorf("you must enter 2 times\\! `/start_routine [poll creation time] [first reminder time] [second reminder time] ...`")
+	}
+
+	parsedTimes := make([]time.Time, len(times))
+
+	for i, t := range times {
+		parsedTime, err := time.Parse("15:04:05", t)
+		if err != nil {
+			return nil, fmt.Errorf("error in %d time format", i+1)
+		}
+		parsedTimes = append(parsedTimes, parsedTime)
+	}
+
+	return parsedTimes, nil
+}
+
 func (srv *Service) createPolls(bot *tgbotapi.BotAPI, chatID int64) {
 	for {
 		select {
-		case <-srv.chatInfo[chatID].done:
+		case <-srv.chatInfo[chatID].Done:
 			return
 		default:
 		}
@@ -87,29 +117,28 @@ func (srv *Service) createPolls(bot *tgbotapi.BotAPI, chatID int64) {
 func (srv *Service) StopRoutine(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
 	var newMsg tgbotapi.MessageConfig
 
-	if !srv.chatInfo[msg.Chat.ID].isWorking {
+	if !srv.chatInfo[msg.Chat.ID].IsWorking {
 		newMsg = tgbotapi.NewMessage(msg.Chat.ID, "Bot is already stopped")
 		bot.Send(newMsg)
 		return
 	}
-	srv.chatInfo[msg.Chat.ID].done <- struct{}{}
-	srv.chatInfo[msg.Chat.ID].isWorking = false
+	srv.chatInfo[msg.Chat.ID].Done <- struct{}{}
+	srv.chatInfo[msg.Chat.ID].IsWorking = false
 
 	newMsg = tgbotapi.NewMessage(msg.Chat.ID, "Bot stopped...")
 	bot.Send(newMsg)
 }
 
 func (srv *Service) AddNewChat(bot *tgbotapi.BotAPI, chatID int64) {
-	srv.chatInfo[chatID] = &ChatInfo{
-		isWorking: false,
-		done:      make(chan struct{}),
-		pollID:    0,
+	srv.chatInfo[chatID] = &domain.ChatInfo{
+		IsWorking: false,
+		Done:      make(chan struct{}),
+		PollInfo:  &domain.PollInfo{},
 	}
 
 	newMsg := tgbotapi.NewMessage(chatID, "Hello everyone!")
 	bot.Send(newMsg)
 	fmt.Println("Added new chat")
-	spew.Dump(srv.chatInfo)
 }
 
 func (srv *Service) RemoveChat(bot *tgbotapi.BotAPI, chatID int64) {
@@ -118,5 +147,4 @@ func (srv *Service) RemoveChat(bot *tgbotapi.BotAPI, chatID int64) {
 	newMsg := tgbotapi.NewMessage(chatID, "Goodbuy everyone!")
 	bot.Send(newMsg)
 	fmt.Println("Removed chat")
-	spew.Dump(srv.chatInfo)
 }
