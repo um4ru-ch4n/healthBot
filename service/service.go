@@ -33,12 +33,27 @@ func NewService(cfg *config.Config) *Service {
 	return newService
 }
 
-func (srv *Service) Help(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
-	newMsg := tgbotapi.NewMessage(msg.Chat.ID, "About bot...")
+func (srv *Service) HelpGroup(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
+	newMsg := tgbotapi.NewMessage(msg.Chat.ID, "About group bot...")
+	bot.Send(newMsg)
+}
+
+func (srv *Service) HelpPrivate(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
+	newMsg := tgbotapi.NewMessage(msg.Chat.ID, "About private bot...")
+	bot.Send(newMsg)
+}
+
+func (srv *Service) UnknownCommand(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
+	newMsg := tgbotapi.NewMessage(msg.Chat.ID, "Sorry, but I don't know this command( Please, type /help command")
 	bot.Send(newMsg)
 }
 
 func (srv *Service) Start(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
+	newMsg := tgbotapi.NewMessage(msg.Chat.ID, "Welcome!")
+	bot.Send(newMsg)
+}
+
+func (srv *Service) StartRoutine(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
 	var newMsg tgbotapi.MessageConfig
 
 	if srv.chatInfo[msg.Chat.ID].isWorking {
@@ -65,11 +80,11 @@ func (srv *Service) createPolls(bot *tgbotapi.BotAPI, chatID int64) {
 
 		fmt.Println("qwer")
 
-		time.Sleep(3 * time.Second)
+		time.Sleep(10 * time.Second)
 	}
 }
 
-func (srv *Service) Stop(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
+func (srv *Service) StopRoutine(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
 	var newMsg tgbotapi.MessageConfig
 
 	if !srv.chatInfo[msg.Chat.ID].isWorking {

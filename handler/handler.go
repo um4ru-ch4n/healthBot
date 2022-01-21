@@ -16,6 +16,13 @@ const (
 	StatusJoin ChatMemberStatus = "member"
 )
 
+type ChatType string
+
+const (
+	ChatPrivate ChatType = "private"
+	ChatGroup   ChatType = "group"
+)
+
 type Router struct {
 	bot     *tgbotapi.BotAPI
 	service *service.Service
@@ -58,28 +65,34 @@ func (r *Router) HandleUpdate(update tgbotapi.Update) {
 }
 
 func (r *Router) HandleMessage(msg *tgbotapi.Message) {
-	if len(msg.NewChatMembers) > 0 {
-		for _, mem := range msg.NewChatMembers {
-			if mem.UserName == r.cfg.BotUsername {
-				r.service.AddNewChat(r.bot, msg.Chat.ID)
-			}
-		}
-	}
-
 	if !msg.IsCommand() {
 		return
 	}
 
-	switch msg.Command() {
-	case "help":
-		r.service.Help(r.bot, msg)
-	case "start":
-		r.service.Start(r.bot, msg)
-	case "stop":
-		r.service.Stop(r.bot, msg)
+	if msg.Chat.Type == string(ChatGroup) {
+		switch msg.Command() {
+		case "help":
+			r.service.HelpGroup(r.bot, msg)
+		case "start_routine":
+			r.service.StartRoutine(r.bot, msg)
+		case "stop_routine":
+			r.service.StopRoutine(r.bot, msg)
+		default:
+			r.service.UnknownCommand(r.bot, msg)
+		}
+		return
+	}
 
-	default:
-		fmt.Printf("command: %s, args: %s", msg.Command(), msg.CommandArguments())
+	if msg.Chat.Type == string(ChatPrivate) {
+		switch msg.Command() {
+		case "help":
+			r.service.HelpPrivate(r.bot, msg)
+		case "start":
+			r.service.Start(r.bot, msg)
+
+		default:
+			r.service.UnknownCommand(r.bot, msg)
+		}
 	}
 }
 
