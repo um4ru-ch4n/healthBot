@@ -1,0 +1,4 @@
+bot:
+  bot_id: bot_id
+  bot_token: bot_token
+  bot_username: bot_username
