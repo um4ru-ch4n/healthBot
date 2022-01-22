@@ -6,6 +6,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/um4aru-ch4n/healthBot/config"
+	"github.com/um4aru-ch4n/healthBot/domain"
 	"github.com/um4aru-ch4n/healthBot/service"
 )
 
@@ -14,13 +15,6 @@ type ChatMemberStatus string
 const (
 	StatusLeft ChatMemberStatus = "left"
 	StatusJoin ChatMemberStatus = "member"
-)
-
-type ChatType string
-
-const (
-	ChatPrivate ChatType = "private"
-	ChatGroup   ChatType = "group"
 )
 
 type Router struct {
@@ -47,8 +41,8 @@ func (r *Router) HandleUpdate(update tgbotapi.Update) {
 	switch {
 	case update.Message != nil:
 		r.HandleMessage(update.Message)
-	case update.Poll != nil:
-		r.HandlePoll(update.Poll, update.FromChat().ID)
+	case update.PollAnswer != nil:
+		r.HandlePoll(update.PollAnswer, 0)
 	case update.MyChatMember != nil:
 		status := update.MyChatMember.NewChatMember.Status
 
@@ -58,7 +52,8 @@ func (r *Router) HandleUpdate(update tgbotapi.Update) {
 		}
 
 		r.HandleUpdateMember(StatusLeft, update.MyChatMember.Chat.ID)
-
+	case update.CallbackQuery != nil:
+		r.HandleCallBackQuery(update.CallbackQuery)
 	default:
 		spew.Dump(update)
 	}
@@ -69,7 +64,7 @@ func (r *Router) HandleMessage(msg *tgbotapi.Message) {
 		return
 	}
 
-	if msg.Chat.Type == string(ChatGroup) {
+	if msg.Chat.IsGroup() {
 		switch msg.Command() {
 		case "help":
 			r.service.HelpGroup(r.bot, msg)
@@ -83,7 +78,7 @@ func (r *Router) HandleMessage(msg *tgbotapi.Message) {
 		return
 	}
 
-	if msg.Chat.Type == string(ChatPrivate) {
+	if msg.Chat.IsPrivate() {
 		switch msg.Command() {
 		case "help":
 			r.service.HelpPrivate(r.bot, msg)
@@ -96,7 +91,7 @@ func (r *Router) HandleMessage(msg *tgbotapi.Message) {
 	}
 }
 
-func (r *Router) HandlePoll(msg *tgbotapi.Poll, chatID int64) {
+func (r *Router) HandlePoll(msg *tgbotapi.PollAnswer, chatID int64) {
 
 }
 
@@ -107,4 +102,23 @@ func (r *Router) HandleUpdateMember(status ChatMemberStatus, chatID int64) {
 	}
 
 	r.service.RemoveChat(r.bot, chatID)
+}
+
+func (r *Router) HandleCallBackQuery(callback *tgbotapi.CallbackQuery) {
+	switch callback.Data {
+	case service.RegisterNewUser:
+		r.service.RegisterNewUser(
+			r.bot,
+			callback.Message.Chat.ID,
+			&domain.User{
+				ID:        callback.From.ID,
+				Username:  callback.From.UserName,
+				Firstname: callback.From.FirstName,
+				Lastname:  callback.From.LastName,
+				ChatID:    0,
+			},
+		)
+	default:
+		fmt.Println("Unknown callback data: ", callback.Data)
+	}
 }
