@@ -3,7 +3,6 @@ package handler
 import (
 	"fmt"
 
-	"github.com/davecgh/go-spew/spew"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/um4aru-ch4n/healthBot/config"
 	"github.com/um4aru-ch4n/healthBot/domain"
@@ -42,7 +41,7 @@ func (r *Router) HandleUpdate(update tgbotapi.Update) {
 	case update.Message != nil:
 		r.HandleMessage(update.Message)
 	case update.PollAnswer != nil:
-		r.HandlePoll(update.PollAnswer, 0)
+		r.HandlePoll(update.PollAnswer)
 	case update.MyChatMember != nil:
 		status := update.MyChatMember.NewChatMember.Status
 
@@ -55,7 +54,7 @@ func (r *Router) HandleUpdate(update tgbotapi.Update) {
 	case update.CallbackQuery != nil:
 		r.HandleCallBackQuery(update.CallbackQuery)
 	default:
-		spew.Dump(update)
+		// spew.Dump(update)
 	}
 }
 
@@ -91,8 +90,8 @@ func (r *Router) HandleMessage(msg *tgbotapi.Message) {
 	}
 }
 
-func (r *Router) HandlePoll(msg *tgbotapi.PollAnswer, chatID int64) {
-
+func (r *Router) HandlePoll(poll *tgbotapi.PollAnswer) {
+	r.service.UpdatePollResults(r.bot, poll.PollID, poll.User.ID, poll.OptionIDs)
 }
 
 func (r *Router) HandleUpdateMember(status ChatMemberStatus, chatID int64) {

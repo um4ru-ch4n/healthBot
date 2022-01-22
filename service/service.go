@@ -6,7 +6,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/davecgh/go-spew/spew"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/um4aru-ch4n/healthBot/config"
 	"github.com/um4aru-ch4n/healthBot/domain"
@@ -17,11 +16,13 @@ const RegisterNewUser = "register_new_user"
 
 type Service struct {
 	chatInfo map[int64]*domain.ChatInfo
+	pollChat map[string]int64
 }
 
 func NewService(cfg *config.Config) *Service {
 	newService := &Service{
 		chatInfo: make(map[int64]*domain.ChatInfo),
+		pollChat: make(map[string]int64),
 	}
 
 	newService.chatInfo[-727028014] = &domain.ChatInfo{
@@ -29,12 +30,29 @@ func NewService(cfg *config.Config) *Service {
 		Done:      make(chan struct{}),
 		PollInfo: &domain.PollInfo{
 			Results: &domain.PollResults{
-				Health:   make(map[int64]bool),
-				Sick:     make(map[int64]bool),
-				Pass:     make(map[int64]bool),
-				Negative: make(map[int64]bool),
-				Positive: make(map[int64]bool),
-				All:      make(map[int64]bool),
+				Results: []domain.Result{
+					{
+						Title: "Здоров",
+						Users: make(map[int64]bool),
+					},
+					{
+						Title: "Болен",
+						Users: make(map[int64]bool),
+					},
+					{
+						Title: "Сдал",
+						Users: make(map[int64]bool),
+					},
+					{
+						Title: "Отрицательный",
+						Users: make(map[int64]bool),
+					},
+					{
+						Title: "Положительный",
+						Users: make(map[int64]bool),
+					},
+				},
+				All: make(map[int64]bool),
 			},
 		},
 		HeadPerson: &domain.User{
@@ -183,11 +201,9 @@ func (srv *Service) createPolls(bot *tgbotapi.BotAPI, chatID int64) {
 				return
 			}
 
-			fmt.Println("pollID: ", poll.Poll.ID)
-			fmt.Println("chatID: ", poll.Chat.ID)
+			srv.pollChat[poll.Poll.ID] = poll.Chat.ID
 
 			srv.chatInfo[chatID].PollInfo.ID = poll.Poll.ID
-
 			srv.chatInfo[chatID].PollInfo.CreationDate = timeNowRaw
 			srv.chatInfo[chatID].PollInfo.Times[0].Done = true
 		}
@@ -232,8 +248,7 @@ func (srv *Service) createPolls(bot *tgbotapi.BotAPI, chatID int64) {
 			firstLetter, _ := utf8.DecodeRuneInString(headPerson.Firstname)
 
 			newMsg := tgbotapi.NewMessage(chatID, fmt.Sprintf(
-				`[%s %s\\.](tg://user?id=%d),\n
-				this users haven't passed the survey\\:\n%s`,
+				"[%s %s\\.](tg://user?id=%d),\nthis users haven't passed the survey\\:\n%s",
 				headPerson.Lastname,
 				string(firstLetter),
 				headPerson.ID,
@@ -253,7 +268,8 @@ func (srv *Service) createPolls(bot *tgbotapi.BotAPI, chatID int64) {
 		if !times[len(times)-1].Done &&
 			timeNow.After(times[len(times)-1].MenTime) &&
 			timeNow.Before(srv.chatInfo[chatID].PollInfo.CreationDate.Add(24*time.Hour)) {
-			spew.Dump(srv.chatInfo[chatID].PollInfo.Results)
+
+			srv.SendResultsTimeout(bot, chatID)
 
 			srv.chatInfo[chatID].PollInfo.Times[len(times)-1].Done = true
 		}
@@ -287,16 +303,39 @@ func (srv *Service) AddNewChat(bot *tgbotapi.BotAPI, chatID int64) {
 		Done:      make(chan struct{}),
 		PollInfo: &domain.PollInfo{
 			Results: &domain.PollResults{
-				Health:   make(map[int64]bool),
-				Sick:     make(map[int64]bool),
-				Pass:     make(map[int64]bool),
-				Negative: make(map[int64]bool),
-				Positive: make(map[int64]bool),
-				All:      make(map[int64]bool),
+				Results: []domain.Result{
+					{
+						Title: "Здоров",
+						Users: make(map[int64]bool),
+					},
+					{
+						Title: "Болен",
+						Users: make(map[int64]bool),
+					},
+					{
+						Title: "Сдал",
+						Users: make(map[int64]bool),
+					},
+					{
+						Title: "Отрицательный",
+						Users: make(map[int64]bool),
+					},
+					{
+						Title: "Положительный",
+						Users: make(map[int64]bool),
+					},
+				},
+				All: make(map[int64]bool),
 			},
 		},
-		HeadPerson: &domain.User{},
-		Users:      make(map[int64]domain.User),
+		HeadPerson: &domain.User{
+			ID:        371947069,
+			Username:  "oooMRXooo",
+			Firstname: "Alexander",
+			Lastname:  "Oleynikov",
+			ChatID:    371947069,
+		},
+		Users: make(map[int64]domain.User),
 	}
 
 	keyboard := tgbotapi.NewInlineKeyboardButtonData("Hi!", RegisterNewUser)
@@ -351,6 +390,112 @@ func (srv *Service) RegisterNewUser(bot *tgbotapi.BotAPI, chatID int64, user *do
 
 	newMsg = tgbotapi.NewMessage(chatID, fmt.Sprintf("Hello %s %s.!", user.Lastname, string(firstLetter)))
 	_, err := bot.Send(newMsg)
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
+func (srv *Service) UpdatePollResults(bot *tgbotapi.BotAPI, pollID string, userID int64, optionIDs []int) {
+	chatID := srv.pollChat[pollID]
+
+	srv.chatInfo[chatID].PollInfo.Results.All[userID] = true
+	srv.chatInfo[chatID].PollInfo.Results.Results[int64(optionIDs[0])].Users[userID] = true
+
+	if len(srv.chatInfo[chatID].PollInfo.Results.All) == len(srv.chatInfo[chatID].Users) {
+		srv.SendResults(bot, chatID)
+	}
+}
+
+func (srv *Service) SendResults(bot *tgbotapi.BotAPI, chatID int64) {
+	var (
+		resultsMsg string
+		sickCount  int32
+	)
+
+	for _, res := range srv.chatInfo[chatID].PollInfo.Results.Results {
+		resultsMsg += fmt.Sprintf("%s:\n", res.Title)
+
+		for userID := range res.Users {
+			if res.Title == "Болен" || res.Title == "Положительный" {
+				sickCount++
+			}
+
+			tmpUser := srv.chatInfo[chatID].Users[userID]
+			firstLetter, _ := utf8.DecodeRuneInString(tmpUser.Firstname)
+
+			resultsMsg += fmt.Sprintf("%s %s.\n", tmpUser.Lastname, string(firstLetter))
+		}
+		resultsMsg += "\n"
+	}
+
+	newMsg := tgbotapi.NewMessage(srv.chatInfo[chatID].HeadPerson.ID, resultsMsg)
+
+	_, err := bot.Send(newMsg)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	if sickCount == 0 {
+		newMsg = tgbotapi.NewMessage(srv.chatInfo[chatID].HeadPerson.ID, "Сегодня заболевших нет!")
+		_, err := bot.Send(newMsg)
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		newSticker := tgbotapi.NewSticker(
+			srv.chatInfo[chatID].HeadPerson.ID,
+			tgbotapi.FileID("CAACAgIAAxkBAAIBwmHsamDfSid1MDODOgWbAAG-FbfHCgACegEAAhAabSKcnbdITu9y3iME"),
+		)
+
+		_, err = bot.Send(newSticker)
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+}
+
+func (srv *Service) SendResultsTimeout(bot *tgbotapi.BotAPI, chatID int64) {
+	var (
+		resultsMsg string
+		sickCount  int32
+	)
+
+	for _, res := range srv.chatInfo[chatID].PollInfo.Results.Results {
+		resultsMsg += fmt.Sprintf("%s:\n", res.Title)
+
+		for userID := range res.Users {
+			if res.Title == "Болен" || res.Title == "Положительный" {
+				sickCount++
+			}
+
+			tmpUser := srv.chatInfo[chatID].Users[userID]
+			firstLetter, _ := utf8.DecodeRuneInString(tmpUser.Firstname)
+
+			resultsMsg += fmt.Sprintf("%s %s.\n", tmpUser.Lastname, string(firstLetter))
+		}
+		resultsMsg += "\n"
+	}
+
+	newMsg := tgbotapi.NewMessage(srv.chatInfo[chatID].HeadPerson.ID, resultsMsg)
+
+	_, err := bot.Send(newMsg)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	var mentionUsers string
+
+	for key := range srv.chatInfo[chatID].Users {
+		if _, ok := srv.chatInfo[chatID].PollInfo.Results.All[key]; !ok {
+			tmpUser := srv.chatInfo[chatID].Users[key]
+			firstLetter, _ := utf8.DecodeRuneInString(tmpUser.Firstname)
+			mentionUsers += fmt.Sprintf("%s %s.\n", tmpUser.Lastname, string(firstLetter))
+		}
+	}
+
+	newMsg = tgbotapi.NewMessage(srv.chatInfo[chatID].HeadPerson.ID, fmt.Sprintf("This people hasn't passed the survey:\n%s", mentionUsers))
+
+	_, err = bot.Send(newMsg)
 	if err != nil {
 		fmt.Println(err)
 	}

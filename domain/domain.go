@@ -23,12 +23,13 @@ type MentionTime struct {
 }
 
 type PollResults struct {
-	Health   map[int64]bool
-	Sick     map[int64]bool
-	Pass     map[int64]bool
-	Negative map[int64]bool
-	Positive map[int64]bool
-	All      map[int64]bool
+	Results []Result // Health, Sick, Pass, Negative, Positive
+	All     map[int64]bool
+}
+
+type Result struct {
+	Title string
+	Users map[int64]bool
 }
 
 type User struct {
