@@ -1,8 +1,9 @@
 version: "3.9"
 services:
-  postgres:
+  db:
     image: postgres:14.0
     environment:
+      TZ: 'Europe/Moscow'
       POSTGRES_DB: "docker_postgres"
       POSTGRES_USER: "postgres"
       POSTGRES_PASSWORD: "postgres"
@@ -26,3 +27,12 @@ services:
         limits:
           cpus: '1'
           memory: 4G
+  
+  bot:
+    environment:
+      TZ: 'Europe/Moscow'
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    depends_on:
+      - db

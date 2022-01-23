@@ -17,12 +17,17 @@ const RegisterNewUser = "register_new_user"
 type Service struct {
 	chatInfo map[int64]*domain.ChatInfo
 	pollChat map[string]int64
+	repo     repository
 }
 
-func NewService(cfg *config.Config) *Service {
+type repository interface {
+}
+
+func NewService(cfg *config.Config, repo repository) *Service {
 	newService := &Service{
 		chatInfo: make(map[int64]*domain.ChatInfo),
 		pollChat: make(map[string]int64),
+		repo:     repo,
 	}
 
 	newService.chatInfo[-727028014] = &domain.ChatInfo{
