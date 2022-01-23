@@ -248,7 +248,7 @@ func (srv *Service) createPolls(bot *tgbotapi.BotAPI, chatID int64) {
 			firstLetter, _ := utf8.DecodeRuneInString(headPerson.Firstname)
 
 			newMsg := tgbotapi.NewMessage(chatID, fmt.Sprintf(
-				"[%s %s\\.](tg://user?id=%d),\nthis users haven't passed the survey\\:\n%s",
+				"[%s %s\\.](tg://user?id=%d),\nthese users haven't passed the survey\\:\n%s",
 				headPerson.Lastname,
 				string(firstLetter),
 				headPerson.ID,
@@ -496,6 +496,25 @@ func (srv *Service) SendResultsTimeout(bot *tgbotapi.BotAPI, chatID int64) {
 	newMsg = tgbotapi.NewMessage(srv.chatInfo[chatID].HeadPerson.ID, fmt.Sprintf("This people hasn't passed the survey:\n%s", mentionUsers))
 
 	_, err = bot.Send(newMsg)
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
+func (srv *Service) SetHeadPerson(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
+	user := msg.From
+
+	srv.chatInfo[msg.Chat.ID].HeadPerson = &domain.User{
+		ID:        user.ID,
+		Username:  user.UserName,
+		Firstname: user.FirstName,
+		Lastname:  user.LastName,
+		ChatID:    user.ID,
+	}
+
+	newMsg := tgbotapi.NewMessage(user.ID, "Now you are head person, congratulations!)")
+
+	_, err := bot.Send(newMsg)
 	if err != nil {
 		fmt.Println(err)
 	}

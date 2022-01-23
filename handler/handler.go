@@ -71,6 +71,8 @@ func (r *Router) HandleMessage(msg *tgbotapi.Message) {
 			r.service.StartRoutine(r.bot, msg)
 		case "stop_routine":
 			r.service.StopRoutine(r.bot, msg)
+		case "set_head_person":
+			r.service.SetHeadPerson(r.bot, msg)
 		default:
 			r.service.UnknownCommand(r.bot, msg)
 		}
